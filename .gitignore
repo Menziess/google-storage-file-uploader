@@ -1,0 +1,10 @@
+.vscode
+test/
+train/
+val/
+credentials.json
+.env
+.venv
+__pycache__/
+.mypy_cache/
+*.egg-info
