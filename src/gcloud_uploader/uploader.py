@@ -11,6 +11,7 @@ import os
 load_dotenv('.env')
 
 BUCKET = os.getenv('BUCKET')
+KNOWN_TOTAL = int(os.getenv('KNOWN_TOTAL', '0'))
 VERBOSE = False
 
 
@@ -70,6 +71,10 @@ def upload_blobs(
     print("Connecting to blob storage...")
     bucket = client.get_bucket(bucket_name)
 
+    # Gather filenames to be uploaded
+    print("Preparing file list to be uploaded...")
+    filenames = list_files(os.path.join(source_folder, pattern))
+
     # Get last uploaded blob to compare new files to
     last_updated_blobname = get_last_uploaded_blobname(
         bucket_name,
@@ -77,11 +82,8 @@ def upload_blobs(
         client
     )
 
-    # # Gather filenames to be uploaded
-    filenames = list_files(os.path.join(source_folder, pattern))
-
     # Copy files 1 to 1 from source to destination if not exitsts
-    for filename in tqdm(filenames):
+    for filename in tqdm(filenames, total=KNOWN_TOTAL):
 
         destination_path = os.path.join(
             destination_folder,
