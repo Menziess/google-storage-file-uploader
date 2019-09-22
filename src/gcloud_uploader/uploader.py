@@ -122,7 +122,9 @@ def retry(
 
             # See if retries have to be reset because last
             # retry was pretty long ago
-            if (
+            if not time_first_failure:
+                pass
+            elif (
                 datetime.now() - time_first_failure
             ).total_seconds() > reset_retries_after_seconds:
                 retries = number_retries
