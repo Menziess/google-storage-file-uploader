@@ -11,6 +11,7 @@ autopep8 = "*"
 [packages]
 google-cloud-storage = "*"
 python-dotenv = "*"
+multiprocessing-logging = "*"
 
 [requires]
 python_version = "3.6"

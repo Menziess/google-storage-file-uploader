@@ -3,13 +3,18 @@ from dotenv import load_dotenv
 from datetime import datetime
 from time import sleep
 
+import multiprocessing_logging
+import multiprocessing
 import argparse
+import logging
 import glob
 import os
 
 load_dotenv('.env')
 
 BUCKET = os.getenv('BUCKET')
+multiprocessing.set_start_method('spawn', True)
+multiprocessing_logging.install_mp_handler()
 
 
 def list_files(pattern='*'):
@@ -28,24 +33,65 @@ def list_blobs(bucket_name, folder='', client=storage.Client()):
             yield path
 
 
+def get_last_uploaded_blobname(bucket_name, destination_folder, client):
+    """Assuming filenames are incrementally increasing, we can compare
+    to the last uploaded filename on blob."""
+
+    # Get existing blobs to prevent reuploading
+    print("Getting existing blob list...")
+    existing_blobs = list(list_blobs(bucket_name, destination_folder, client))
+
+    item = None
+    for x in existing_blobs:
+        item = x
+    return item
+
+
 def upload_blob(
     bucket,
     source_file_name,
-    destination_blob_name
+    destination_blob_name,
+    log
 ):
     """Uploads a file to the bucket."""
     blob = bucket.blob(destination_blob_name)
-    blob.upload_from_filename(source_file_name)
-    print('File {} uploaded to {}.'.format(
+    # blob.upload_from_filename(source_file_name)
+    log.info(blob)
+    log.info('File {} uploaded to {}.'.format(
         source_file_name,
         destination_blob_name))
+
+
+def worker(
+    bucket,
+    filename,
+    destination_folder,
+    source_folder,
+    last_uploaded_blobname,
+    log
+):
+    destination_path = os.path.join(
+        destination_folder,
+        os.path.relpath(filename, source_folder)
+    )
+
+    if destination_path > last_uploaded_blobname:
+        upload_blob(
+            bucket,
+            filename,
+            destination_path,
+            log
+        )
+    else:
+        log.info('Already uploaded:' + filename)
 
 
 def upload_blobs(
     bucket_name,
     source_folder,
     destination_folder,
-    pattern='**/*'
+    pattern='**/*',
+    parallelism=4
 ):
     """Uploads files recursively to the bucket."""
     client = storage.Client()
@@ -53,29 +99,32 @@ def upload_blobs(
     print("Connecting to blob storage...")
     bucket = client.get_bucket(bucket_name)
 
-    # Get existing blobs to prevent reuploading
-    print("Getting existing blob list...")
-    existing_blobs = list(list_blobs(bucket_name, destination_folder, client))
-
     # # Gather filenames to be uploaded
     filenames = list_files(os.path.join(source_folder, pattern))
 
-    # Copy files 1 to 1 from source to destination if not exitsts
+    # Used to determine whether next file must be uploaded
+    last_uploaded_blobname = get_last_uploaded_blobname(
+        bucket_name,
+        destination_folder,
+        client
+    )
+
+    log = logging.getLogger()
+
     for filename in filenames:
-
-        destination_path = os.path.join(
-            destination_folder,
-            os.path.relpath(filename, source_folder)
-        )
-
-        if destination_path not in existing_blobs:
-            upload_blob(
+        p = multiprocessing.Process(
+            target=worker,
+            args=(
                 bucket,
                 filename,
-                destination_path
+                destination_folder,
+                source_folder,
+                last_uploaded_blobname,
+                log
             )
-        else:
-            print('Already uploaded:', filename)
+        )
+        p.start()
+        p.join()
 
 
 def get_args():
@@ -122,7 +171,9 @@ def retry(
 
             # See if retries have to be reset because last
             # retry was pretty long ago
-            if (
+            if not time_first_failure:
+                time_first_failure = datetime.now()
+            elif (
                 datetime.now() - time_first_failure
             ).total_seconds() > reset_retries_after_seconds:
                 retries = number_retries
