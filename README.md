@@ -10,7 +10,7 @@ Run the following commands:
 
 ```bash
 python setup.py install
-upload
+upload -in-folder ../../Downloads/Videos -out-folder videos/ --pattern **/*
 ```
 
 Files that already exist will not be overwritten.
