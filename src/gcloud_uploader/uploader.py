@@ -2,6 +2,7 @@ from google.cloud import storage
 from dotenv import load_dotenv
 from datetime import datetime
 from time import sleep
+from tqdm import tqdm
 
 import argparse
 import glob
@@ -10,6 +11,7 @@ import os
 load_dotenv('.env')
 
 BUCKET = os.getenv('BUCKET')
+VERBOSE = False
 
 
 def list_files(pattern='*'):
@@ -50,9 +52,10 @@ def upload_blob(
     """Uploads a file to the bucket."""
     blob = bucket.blob(destination_blob_name)
     blob.upload_from_filename(source_file_name)
-    print('File {} uploaded to {}.'.format(
-        source_file_name,
-        destination_blob_name))
+    if VERBOSE:
+        print('File {} uploaded to {}.'.format(
+            source_file_name,
+            destination_blob_name))
 
 
 def upload_blobs(
@@ -78,7 +81,7 @@ def upload_blobs(
     filenames = list_files(os.path.join(source_folder, pattern))
 
     # Copy files 1 to 1 from source to destination if not exitsts
-    for filename in filenames:
+    for filename in tqdm(filenames):
 
         destination_path = os.path.join(
             destination_folder,
@@ -92,7 +95,8 @@ def upload_blobs(
                 destination_path
             )
         else:
-            print('Already uploaded:', filename)
+            if VERBOSE:
+                print('Already uploaded:', filename)
 
 
 def get_args():
@@ -113,6 +117,12 @@ def get_args():
         type=str,
         default='**/*',
         help='The glob pattern used to select files in folder.'
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        help="increase output verbosity",
+        action="store_true"
     )
     return parser.parse_args()
 
@@ -174,6 +184,10 @@ def upload():
             out_folder = input("Google Storage Path:\n")
         else:
             assert os.path.isdir(args.in_folder), "Path doesn't exist..."
+
+        if args.verbose:
+            global VERBOSE
+            VERBOSE = True
 
         arguments = {
             'bucket_name': BUCKET,
