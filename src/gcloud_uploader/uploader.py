@@ -1,12 +1,13 @@
 from google.cloud import storage
 from dotenv import load_dotenv
 
-import os
+import argparse
 import glob
-
-IMAGE_BUCKET = 'eu.artifacts.xcc-reverse-image-wed.appspot.com'
+import os
 
 load_dotenv('.env')
+
+BUCKET = os.getenv('BUCKET')
 
 
 def list_files(pattern='*'):
@@ -75,19 +76,43 @@ def upload_blobs(
             print('Already uploaded:', filename)
 
 
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-in-folder", type=str,
+                        help='The input folder from which files are uploaded.')
+    parser.add_argument("-out-folder", type=str,
+                        help='The output folder on blob storage.')
+    parser.add_argument("--pattern", type=str, default='**/*',
+                        help='The glob pattern used to select files in folder.')
+    return parser.parse_args()
+
+
 def upload():
+
+    args = get_args()
+
     try:
-        print("Let's upload some stuff to Google Cloud.")
-        local_path = input("Local Folder:\n")
-        assert os.path.isdir(local_path), "Path doesn't exist..."
-        pattern = input("Glob Pattern: (leave blank for recursive all)\n")
-        cloud_path = input("Google Storage Path:\n")
-        if pattern:
-            upload_blobs(IMAGE_BUCKET, local_path, cloud_path, pattern)
-        else:
-            upload_blobs(IMAGE_BUCKET, local_path, cloud_path)
+        if not args.in_folder and not args.out_folder:
+
+            print("Let's upload some stuff to Google Cloud.")
+            in_folder = input("Local Folder:\n")
+            assert os.path.isdir(local_path), "Path doesn't exist..."
+            pattern = input("Glob Pattern: (leave blank for recursive all)\n")
+            out_folder = input("Google Storage Path:\n")
+
+        arguments = {
+            'bucket_name': BUCKET,
+            'source_folder': args.in_folder or in_folder,
+            'destination_folder': args.out_folder or out_folder,
+            'pattern': args.pattern or pattern or '**/*'
+        }
+
+        upload_blobs(**arguments)
+        print("\nFinished uploading.")
+
     except KeyboardInterrupt:
         print("\nYou stopped the program.")
+
 
 if __name__ == "__main__":
     upload()
