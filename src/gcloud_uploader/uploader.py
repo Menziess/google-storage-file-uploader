@@ -28,6 +28,20 @@ def list_blobs(bucket_name, folder='', client=storage.Client()):
             yield path
 
 
+def get_last_uploaded_blobname(bucket_name, destination_folder, client):
+    """Assuming filenames are incrementally increasing, we can compare
+    to the last uploaded filename on blob."""
+
+    # Get existing blobs to prevent reuploading
+    print("Getting existing blob list...")
+    existing_blobs = list(list_blobs(bucket_name, destination_folder, client))
+
+    item = None
+    for x in existing_blobs:
+        item = x
+    return item
+
+
 def upload_blob(
     bucket,
     source_file_name,
@@ -53,9 +67,12 @@ def upload_blobs(
     print("Connecting to blob storage...")
     bucket = client.get_bucket(bucket_name)
 
-    # Get existing blobs to prevent reuploading
-    print("Getting existing blob list...")
-    existing_blobs = list(list_blobs(bucket_name, destination_folder, client))
+    # Get last uploaded blob to compare new files to
+    last_updated_blobname = get_last_uploaded_blobname(
+        bucket_name,
+        destination_folder,
+        client
+    )
 
     # # Gather filenames to be uploaded
     filenames = list_files(os.path.join(source_folder, pattern))
@@ -68,7 +85,7 @@ def upload_blobs(
             os.path.relpath(filename, source_folder)
         )
 
-        if destination_path not in existing_blobs:
+        if destination_path > last_updated_blobname:
             upload_blob(
                 bucket,
                 filename,
