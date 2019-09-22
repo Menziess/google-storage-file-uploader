@@ -77,13 +77,24 @@ def upload_blobs(
 
 
 def get_args():
+    """Get arguments."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("-in-folder", type=str,
-                        help='The input folder from which files are uploaded.')
-    parser.add_argument("-out-folder", type=str,
-                        help='The output folder on blob storage.')
-    parser.add_argument("--pattern", type=str, default='**/*',
-                        help='The glob pattern used to select files in folder.')
+    parser.add_argument(
+        "-in-folder",
+        type=str,
+        help='The input folder from which files are uploaded.'
+    )
+    parser.add_argument(
+        "-out-folder",
+        type=str,
+        help='The output folder on blob storage.'
+    )
+    parser.add_argument(
+        "--pattern",
+        type=str,
+        default='**/*',
+        help='The glob pattern used to select files in folder.'
+    )
     return parser.parse_args()
 
 
@@ -92,12 +103,12 @@ def upload():
     args = get_args()
 
     try:
-        if not args.in_folder and not args.out_folder:
 
+        if not args.in_folder and not args.out_folder:
             print("Let's upload some stuff to Google Cloud.")
             in_folder = input("Local Folder:\n")
-            assert os.path.isdir(local_path), "Path doesn't exist..."
-            pattern = input("Glob Pattern: (leave blank for recursive all)\n")
+            assert os.path.isdir(in_folder), "Path doesn't exist..."
+            pattern = input("Glob Pattern: (default: '**/*')\n")
             out_folder = input("Google Storage Path:\n")
 
         arguments = {
