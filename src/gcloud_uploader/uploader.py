@@ -1,5 +1,7 @@
 from google.cloud import storage
 from dotenv import load_dotenv
+from datetime import datetime
+from time import sleep
 
 import argparse
 import glob
@@ -98,18 +100,61 @@ def get_args():
     return parser.parse_args()
 
 
+def retry(
+    f,
+    number_retries=5,
+    seconds_between=5,
+    reset_retries_after_seconds=200
+):
+    """Retry when a function fails."""
+
+    retries = number_retries
+    time_first_failure = None
+    exceptions = []
+
+    while retries:
+        try:
+            f()
+        except Exception as e:
+
+            # Store exception
+            exceptions.append(e)
+
+            # See if retries have to be reset because last
+            # retry was pretty long ago
+            if (
+                datetime.now() - time_first_failure
+            ).total_seconds() > reset_retries_after_seconds:
+                retries = number_retries
+
+            # Handle retry logic
+            retries -= 1
+            time_first_failure = time_first_failure or datetime.now()
+            print(str(e))
+
+            # Wait a bit for next try
+            sleep(seconds_between)
+
+    # Print exception messages
+    print('Program failed:', retries, '/', number_retries, 'left.')
+    [print(str(x)) for x in exceptions]
+    raise exceptions[-1]
+
+
 def upload():
 
     args = get_args()
 
     try:
 
-        if not args.in_folder and not args.out_folder:
+        if not args.in_folder or not args.out_folder:
             print("Let's upload some stuff to Google Cloud.")
             in_folder = input("Local Folder:\n")
             assert os.path.isdir(in_folder), "Path doesn't exist..."
             pattern = input("Glob Pattern: (default: '**/*')\n")
             out_folder = input("Google Storage Path:\n")
+        else:
+            assert os.path.isdir(args.in_folder), "Path doesn't exist..."
 
         arguments = {
             'bucket_name': BUCKET,
@@ -118,7 +163,15 @@ def upload():
             'pattern': args.pattern or pattern or '**/*'
         }
 
-        upload_blobs(**arguments)
+        def job(): return upload_blobs(**arguments)
+
+        retry(
+            job,
+            number_retries=5,
+            seconds_between=5,
+            reset_retries_after_seconds=200
+        )
+
         print("\nFinished uploading.")
 
     except KeyboardInterrupt:
